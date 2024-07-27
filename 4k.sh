@@ -30,10 +30,9 @@ if [[ ! "${target}" ]]; then
 fi
 mkdir -p "${target}"
 
-key_frames_interval="$(ffprobe "${source}" 2>&1 | grep -oE '[[:digit:]]+(.[[:digit:]]+)? fps' | grep -oE '[[:digit:]]+(.[[:digit:]]+)?')*2 | bc || echo '')"
+# Calculate key frames interval
+key_frames_interval=$(ffprobe "${source}" 2>&1 | grep -oP '(?<=\[Parsed_select_0\] [\d]+ fps)' | awk '{print int($1 * 2)}')
 key_frames_interval=${key_frames_interval:-50}
-key_frames_interval=$(echo "scale=1; ${key_frames_interval}/10" | bc | awk '{printf "%.0f", $0 * 10}')
-key_frames_interval=${key_frames_interval%.*} # Round to integer
 
 # Static parameters that are similar for all renditions
 static_params="-c:a aac -ar 48000 -c:v h264_nvenc -profile:v main -preset p1 -g ${key_frames_interval} -keyint_min ${key_frames_interval} -hls_time ${segment_target_duration} -hls_playlist_type vod"
