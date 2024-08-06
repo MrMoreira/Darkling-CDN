@@ -40,7 +40,7 @@ key_frames_interval=${key_frames_interval%.*} # truncate to integer
 # static parameters that are similar for all renditions
 static_params="-c:a aac -ar 48000 -c:v libx265 -preset slow -crf 20 -sc_threshold 0"
 static_params+=" -g ${key_frames_interval} -keyint_min ${key_frames_interval} -hls_time ${segment_target_duration}"
-static_params+=" -hls_playlist_type vod"
+static_params+=" -hls_playlist_type vod -tag:v hvc1"
 
 # misc params
 misc_params="-hide_banner -y"
