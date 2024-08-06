@@ -40,12 +40,12 @@ static_params+=" -g ${key_frames_interval} -keyint_min ${key_frames_interval} -h
 static_params+=" -hls_playlist_type vod"
 
 # misc params
-misc_params="-hide_banner -y"
+misc_params="-hide_banner -y -hwaccel cuda"
 
 master_playlist="#EXTM3U
 #EXT-X-VERSION:3
 "
-cmd="ffmpeg -hwaccel cuda -i ${source} ${misc_params}"
+cmd="ffmpeg ${misc_params} -i ${source}"
 for rendition in "${renditions[@]}"; do
   # drop extraneous spaces
   rendition="${rendition/[[:space:]]+/ }"
@@ -63,4 +63,18 @@ for rendition in "${renditions[@]}"; do
   bandwidth="$(echo ${bitrate} | grep -oE '[[:digit:]]+')000"
   name="${height}p"
   
-  cmd+=" ${static_params
+  cmd+=" ${static_params} -vf scale=w=${width}:h=${height}:force_original_aspect_ratio=decrease"
+  cmd+=" -b:v ${bitrate} -maxrate ${maxrate%.*}k -bufsize ${bufsize%.*}k -b:a ${audiorate}"
+  cmd+=" -hls_segment_filename ${target}/${name}_%03d.ts ${target}/${name}.m3u8"
+  
+  # add rendition entry in the master playlist
+  master_playlist+="#EXT-X-STREAM-INF:BANDWIDTH=${bandwidth},RESOLUTION=${resolution}\n${name}.m3u8\n"
+done
+
+# start conversion
+echo -e "Executing command:\n${cmd}"
+eval "${cmd}"
+
+# create master playlist file
+echo -e "${master_playlist}" > ${target}/playlist.m3u8
+
