@@ -5,14 +5,16 @@ set -e
 # Usage create-vod-hls.sh SOURCE_FILE [OUTPUT_NAME]
 [[ ! "${1}" ]] && echo "Usage: create-vod-hls.sh SOURCE_FILE [OUTPUT_NAME]" && exit 1
 
-# Comment/add lines here to control which renditions would be created
+# comment/add lines here to control which renditions would be created
 renditions=(
-  "640x360    1000k    128k"
-  "842x480    1500k    128k"
-  "1280x720   3000k    192k"
-  "1920x1080  6000k    192k"
-  "2560x1440  9000k    192k"
-  "3840x2160  15000k   192k"
+  # resolution  bitrate  audio-rate
+  # "426x240    400k    64k"
+  "640x360    800k     96k"
+  "842x480    1400k    128k"
+  "1280x720   2800k    128k"
+  "1920x1080  5000k    192k"
+  "2560x1440  8000k    192k"
+  "3840x2160  16000k   192k"
 )
 
 segment_target_duration=4       # try to create a new segment every X seconds
@@ -29,23 +31,24 @@ if [[ ! "${target}" ]]; then
 fi
 mkdir -p ${target}
 
+
 key_frames_interval="$(echo `ffprobe ${source} 2>&1 | grep -oE '[[:digit:]]+(.[[:digit:]]+)? fps' | grep -oE '[[:digit:]]+(.[[:digit:]]+)?'`*2 | bc || echo '')"
 key_frames_interval=${key_frames_interval:-50}
 key_frames_interval=$(echo `printf "%.1f\n" $(bc -l <<<"$key_frames_interval/10")`*10 | bc) # round
 key_frames_interval=${key_frames_interval%.*} # truncate to integer
 
 # static parameters that are similar for all renditions
-static_params="-c:a aac -b:a 192k -ar 48000 -c:v libx265 -crf 28 -sc_threshold 0"
+static_params="-c:a aac -ar 48000 -c:v libx265 -preset slow -crf 20 -sc_threshold 0"
 static_params+=" -g ${key_frames_interval} -keyint_min ${key_frames_interval} -hls_time ${segment_target_duration}"
 static_params+=" -hls_playlist_type vod"
 
 # misc params
-misc_params="-hide_banner -y -hwaccel cuda"
+misc_params="-hide_banner -y"
 
 master_playlist="#EXTM3U
 #EXT-X-VERSION:3
 "
-cmd="ffmpeg ${misc_params} -i ${source}"
+cmd=""
 for rendition in "${renditions[@]}"; do
   # drop extraneous spaces
   rendition="${rendition/[[:space:]]+/ }"
@@ -72,8 +75,10 @@ for rendition in "${renditions[@]}"; do
 done
 
 # start conversion
-echo -e "Executing command:\n${cmd}"
-eval "${cmd}"
+echo -e "Executing command:\nffmpeg ${misc_params} -i ${source} ${cmd}"
+ffmpeg ${misc_params} -i ${source} ${cmd}
 
 # create master playlist file
 echo -e "${master_playlist}" > ${target}/playlist.m3u8
+
+echo "Done - encoded HLS is at ${target}/"
